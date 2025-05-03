@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Schedule Management</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+        .submission-form, #clientSection {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            gap: 15px;
+            align-items: center;
+        }
+        .submission-form {
+            display: flex;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="password"], select, textarea, button {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        select {
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .hidden {
+            display: none;
+        }
+        .status-pending {
+            background-color: #ffdddd; /* Light red */
+            color: #ff0000; /* Red text for better visibility */
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status-on-process {
+            background-color: #ffffdd; /* Light yellow */
+            color: #ffaa00; /* Orange/Yellow text */
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status-solved {
+            background-color: #ddffdd; /* Light green */
+            color: #00aa00; /* Green text */
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .edit-row {
+            background-color: #e0f7fa; /* Light cyan to indicate editing */
+        }
+        .edit-controls {
+            display: flex;
+            gap: 5px;
+        }
+        .edit-controls button {
+            padding: 5px 8px;
+            font-size: small;
+        }
+    </style>
+</head>
+<body>
+    <div id="clientSection">
+        <h2>Submit New Service Request</h2>
+        <div class="submission-form">
+            <div class="form-group">
+                <label for="companyName">Company Name:</label>
+                <input type="text" id="companyName" name="companyName">
+            </div>
+            <div class="form-group">
+                <label for="stage">Stage:</label>
+                <select id="stage" name="stage">
+                    <option value="">Select Stage</option>
+                    <option value="Inspect on">Inspect on</option>
+                    <option value="Service">Service</option>
+                    <option value="Parts Delivery & Servicing">Parts Delivery & Servicing</option>
+                    <option value="Parts Delivery">Parts Delivery</option>
+                    <option value="Bill Submit & Forklift Collection">Bill Submit & Forklift Collection</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="notes">Problem Notes:</label>
+                <textarea id="notes" name="notes" rows="3"></textarea>
+            </div>
+            <button onclick="submitRequest()">Submit Request</button>
+        </div>
+    </div>
+
+    <h2>Service Requests Overview</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Sl No:</th>
+                <th>Company Name</th>
+                <th>Start Date</th>
+                <th>Stage</th>
+                <th>Tx Notes</th>
+                <th>Ticket Status</th>
+                <th>Service Person</th>
+                <th>Current Duration</th>
+                <th>End Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="clientOverviewTableBody">
+        </tbody>
+    </table>
+
+    <script>
+        const stageOptions = ["Inspect on", "Service", "Parts Delivery & Servicing", "Parts Delivery", "Bill Submit & Forklift Collection"];
+        const statusOptions = ["Pending", "On Process", "Solved"];
+        let allServiceRequests = loadServiceRequests();
+        let editingClientRowIndex = -1; // To track the row being edited by the client
+
+        // Initially show the client section
+        document.getElementById("clientSection").classList.remove("hidden");
+
+        // Initially populate the client overview table
+        populateClientOverviewTable();
+
+        function loadServiceRequests() {
+            const storedRequests = localStorage.getItem('serviceRequests');
+            return storedRequests ? JSON.parse(storedRequests) : [];
+        }
+
+        function saveServiceRequests() {
+            localStorage.setItem('serviceRequests', JSON.stringify(allServiceRequests));
+        }
+
+        function populateClientOverviewTable() {
+            const tableBody = document.getElementById("clientOverviewTableBody");
+            tableBody.innerHTML = "";
+
+            // Filter for pending requests
+            const pendingRequests = allServiceRequests.filter(item => (item.ticketStatus || item.status) === "Pending");
+
+            // Sort pending requests by start date (oldest first)
+            pendingRequests.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+            // Filter for non-pending requests
+            const nonPendingRequests = allServiceRequests.filter(item => (item.ticketStatus || item.status) !== "Pending");
+
+            // Combine the sorted pending requests with the non-pending requests
+            const sortedRequests = [...pendingRequests, ...nonPendingRequests];
+
+            sortedRequests.forEach((item, index) => {
+                const row = tableBody.insertRow();
+                row.dataset.index = allServiceRequests.findIndex(req => req === item); // Get original index
+
+                let cell = row.insertCell();
+                cell.textContent = index + 1; // Serial number based on the sorted order
+
+                cell = row.insertCell();
+                cell.textContent = item.companyName;
+
+                cell = row.insertCell();
+                cell.textContent = item.startDate;
+
+                cell = row.insertCell();
+                cell.textContent = item.stage;
+
+                cell = row.insertCell();
+                cell.textContent = item.txNotes;
+
+                cell = row.insertCell();
+                const statusText = item.ticketStatus || item.status;
+                const statusDiv = document.createElement('div');
+                statusDiv.textContent = statusText;
+                statusDiv.classList.add(`status-${statusText.toLowerCase().replace(' ', '-')}`);
+                cell.appendChild(statusDiv);
+
+                cell = row.insertCell();
+                cell.textContent = item.servicePerson || "Not Assigned"; // Show assigned service person
+
+                cell = row.insertCell();
+                cell.textContent = calculateDuration(item.startDate, item.endDate);
+
+                cell = row.insertCell();
+                cell.textContent = item.endDate || "";
+
+                cell = row.insertCell();
+                const controlsDiv = document.createElement("div");
+                controlsDiv.classList.add("edit-controls");
+
+                const editButton = document.createElement("button");
+                editButton.textContent = "Edit";
+                editButton.onclick = () => startClientEdit(allServiceRequests.findIndex(req => req === item), row);
+                controlsDiv.appendChild(editButton);
+
+                cell.appendChild(controlsDiv);
+            });
+        }
+
+        function startClientEdit(index, rowElement) {
+            if (editingClientRowIndex !== -1) {
+                alert("Please save or cancel the current edit before editing another request.");
+                return;
+            }
+            editingClientRowIndex = index;
+            rowElement.classList.add("edit-row");
+            const request = allServiceRequests[index];
+            rowElement.innerHTML = '';
+
+            let cell = rowElement.insertCell();
+            cell.textContent = index + 1; // Serial number is not editable
+
+            cell = rowElement.insertCell();
+            const companyNameInput = document.createElement("input");
+            companyNameInput.type = "text";
+            companyNameInput.value = request.companyName;
+            cell.appendChild(companyNameInput);
+
+            cell = rowElement.insertCell();
+            cell.textContent = request.startDate; // Start date is not editable by client
+
+            cell = rowElement.insertCell();
+            const stageSelect = document.createElement("select");
+            stageOptions.forEach(option => {
+                const opt = document.createElement("option");
+                opt.value = option;
+                opt.textContent = option;
+                opt.selected = request.stage === option;
+                stageSelect.appendChild(opt);
+            });
+            cell.appendChild(stageSelect);
+
+            cell = rowElement.insertCell();
+            const notesTextarea = document.createElement("textarea");
+            notesTextarea.value = request.txNotes;
+            cell.appendChild(notesTextarea);
+
+            cell = rowElement.insertCell();
+            const statusDiv = document.createElement('div');
+            const statusText = request.ticketStatus || request.status;
+            statusDiv.textContent = statusText;
+            statusDiv.classList.add(`status-${statusText.toLowerCase().replace(' ', '-')}`);
+            cell.appendChild(statusDiv); // Ticket status is not editable by client
+
+            cell = rowElement.insertCell();
+            cell.textContent = request.servicePerson || "Not Assigned"; // Show assigned service person
+
+            cell = rowElement.insertCell();
+            cell.textContent = calculateDuration(request.startDate, request.endDate);
+
+            cell = rowElement.insertCell();
+            cell.textContent = request.endDate || ""; // End date is not editable by client
+
+            cell = rowElement.insertCell();
+            const controlsDiv = document.createElement("div");
+            controlsDiv.classList.add("edit-controls");
+
+            const saveButton = document.createElement("button");
+            saveButton.textContent = "Save";
+            saveButton.onclick = () => saveClientEdit(index, rowElement);
+            controlsDiv.appendChild(saveButton);
+
+            const cancelButton = document.createElement("button");
+            cancelButton.textContent = "Cancel";
+            cancelButton.onclick = () => cancelClientEdit(index, rowElement);
+            controlsDiv.appendChild(cancelButton);
+
+            cell.appendChild(controlsDiv);
+        }
+
+        function saveClientEdit(index, rowElement) {
+            const updatedRequest = { ...allServiceRequests[index] };
+            const cells = rowElement.querySelectorAll('input[type="text"], select, textarea');
+
+            updatedRequest.companyName = cells[0].value;
+            updatedRequest.stage = cells[1].value;
+            updatedRequest.txNotes = cells[2].value;
+
+            allServiceRequests[index] = updatedRequest;
+            saveServiceRequests();
+            populateClientOverviewTable();
+            editingClientRowIndex = -1;
+        }
+
+        function cancelClientEdit(index, rowElement) {
+            populateClientOverviewTable();
+            editingClientRowIndex = -1;
+        }
+
+        function calculateDuration(startDate, endDate) {
+            if (!startDate) return "";
+            const start = new Date(startDate);
+            const today = new Date();
+            let end;
+            if (endDate) {
+                end = new Date(endDate);
+                const diffInDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+                return `${diffInDays} days`;
+            } else {
+                const diffInDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+                return `${diffInDays} days`;
+            }
+        }
+
+        function submitRequest() {
+            const companyNameInput = document.getElementById("companyName");
+            const stageSelect = document.getElementById("stage");
+            const notesTextarea = document.getElementById("notes");
+
+            const companyName = companyNameInput.value.trim();
+            const selectedStage = stageSelect.value;
+            const problemNotes = notesTextarea.value.trim();
+
+            if (companyName && selectedStage && problemNotes) {
+                const newRequest = {
+                    companyName: companyName,
+                    startDate: formatDate(new Date()),
+                    stage: selectedStage,
+                    txNotes: problemNotes,
+                    ticketStatus: "Pending",
+                    endDate: "",
+                    servicePerson: "" // Initially no service person assigned
+                };
+
+                allServiceRequests.push(newRequest);
+                saveServiceRequests();
+                populateClientOverviewTable();
+                alert("Request submitted!");
+                companyNameInput.value = "";
+                stageSelect.value = "";
+                notesTextarea.value = "";
+            } else {
+                alert("Please fill in all the fields.");
+            }
+            // In a real application, you would send this to the backend
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${month}/${day}/${year}`;
+        }
+
+        // Load initial data
+        populateClientOverviewTable();
+    </script>
+</body>
+</html>

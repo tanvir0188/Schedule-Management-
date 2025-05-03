@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Schedule Management - Management</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+        .login-form, #managementSection, #addManagerSection {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            gap: 15px;
+            align-items: center;
+        }
+        .login-form, #addManagerSection {
+            display: flex;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="password"], select, textarea, button {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        select {
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .hidden {
+            display: none;
+        }
+        #managementLoginSection {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #managementLoginSection button {
+            padding: 10px 15px;
+            font-size: 16px;
+        }
+        .status-pending {
+            background-color: #ffdddd; /* Light red */
+            color: #ff0000; /* Red text for better visibility */
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status-on-process {
+            background-color: #ffffdd; /* Light yellow */
+            color: #ffaa00; /* Orange/Yellow text */
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status-solved {
+            background-color: #ddffdd; /* Light green */
+            color: #00aa00; /* Green text */
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="managementLoginSection">
+        <h2>Management Login</h2>
+        <div id="loginContainer">
+            <div class="login-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password">
+                </div>
+                <button onclick="login()">Login</button>
+            </div>
+            <p id="errorMessage" style="color: red;"></p>
+        </div>
+    </div>
+
+    <div id="managementSection" class="hidden">
+        <h2>Management Dashboard</h2>
+        <div id="addManagerSection" class="addManagerSection">
+            <h3>Add New Manager</h3>
+            <div class="form-group">
+                <label for="newUsername">New Username:</label>
+                <input type="text" id="newUsername">
+            </div>
+            <div class="form-group">
+                <label for="newPassword">New Password:</label>
+                <input type="password" id="newPassword">
+            </div>
+            <button onclick="addNewManager()">Add Manager</button>
+            <p id="addManagerMessage"></p>
+        </div>
+
+        <h2>Service Requests (Management View)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sl No:</th>
+                    <th>Company Name</th>
+                    <th>Start Date</th>
+                    <th>Stage</th>
+                    <th>Tx Notes</th>
+                    <th>Ticket Status</th>
+                    <th>Service Person</th>
+                    <th>Status</th>
+                    <th>Current Duration</th>
+                    <th>End Date</th>
+                </tr>
+            </thead>
+            <tbody id="allRequestsTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const stageOptions = ["Inspect on", "Service", "Parts Delivery & Servicing", "Parts Delivery", "Bill Submit & Forklift Collection"];
+        const statusOptions = ["Pending", "On Process", "Solved"];
+        let managementCredentials = loadManagementCredentials(); // Load credentials from localStorage
+        let isManagement = false;
+        let allServiceRequests = loadServiceRequests();
+
+        // Initially show the management login section
+        document.getElementById("managementSection").classList.add("hidden");
+        document.getElementById("managementLoginSection").classList.remove("hidden");
+
+        function loadServiceRequests() {
+            const storedRequests = localStorage.getItem('serviceRequests');
+            return storedRequests ? JSON.parse(storedRequests) : [];
+        }
+
+        function saveServiceRequests() {
+            localStorage.setItem('serviceRequests', JSON.stringify(allServiceRequests));
+        }
+
+        function loadManagementCredentials() {
+            const storedCredentials = localStorage.getItem('managementCredentials');
+            return storedCredentials ? JSON.parse(storedCredentials) : { "root@admin.com": "root123" };
+        }
+
+        function saveManagementCredentials() {
+            localStorage.setItem('managementCredentials', JSON.stringify(managementCredentials));
+        }
+
+        function login() {
+            const usernameInput = document.getElementById("username");
+            const passwordInput = document.getElementById("password");
+            const errorMessage = document.getElementById("errorMessage");
+            const loginContainer = document.getElementById("loginContainer");
+            const managementSection = document.getElementById("managementSection");
+            const managementLoginSection = document.getElementById("managementLoginSection");
+
+            const username = usernameInput.value;
+            const password = passwordInput.value;
+
+            if (managementCredentials[username] && managementCredentials[username] === password) {
+                isManagement = true;
+                loginContainer.classList.add("hidden");
+                managementSection.classList.remove("hidden");
+                managementLoginSection.style.display = 'none';
+                populateAllRequestsTable();
+            } else {
+                errorMessage.textContent = "Invalid username or password.";
+            }
+        }
+
+        function addNewManager() {
+            const newUsernameInput = document.getElementById("newUsername");
+            const newPasswordInput = document.getElementById("newPassword");
+            const addManagerMessage = document.getElementById("addManagerMessage");
+
+            const newUsername = newUsernameInput.value.trim();
+            const newPassword = newPasswordInput.value.trim();
+
+            if (newUsername && newPassword) {
+                if (!managementCredentials[newUsername]) {
+                    managementCredentials[newUsername] = newPassword;
+                    saveManagementCredentials(); // Save the new credentials to localStorage
+                    addManagerMessage.textContent = `Manager "${newUsername}" added successfully.`;
+                    newUsernameInput.value = "";
+                    newPasswordInput.value = "";
+                    console.log("New Manager Added:", managementCredentials);
+                } else {
+                    addManagerMessage.textContent = `Username "${newUsername}" already exists.`;
+                }
+            } else {
+                addManagerMessage.textContent = "Please enter both username and password.";
+            }
+            // In a real application, you would send this to a backend to update user roles
+        }
+
+        function populateAllRequestsTable() {
+            const tableBody = document.getElementById("allRequestsTableBody");
+            tableBody.innerHTML = "";
+
+            // Filter for pending requests
+            const pendingRequests = allServiceRequests.filter(item => (item.ticketStatus || item.status) === "Pending");
+
+            // Sort pending requests by start date (oldest first)
+            pendingRequests.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+            // Filter for non-pending requests
+            const nonPendingRequests = allServiceRequests.filter(item => (item.ticketStatus || item.status) !== "Pending");
+
+            // Combine the sorted pending requests with the non-pending requests
+            const sortedRequests = [...pendingRequests, ...nonPendingRequests];
+
+            sortedRequests.forEach((item, index) => {
+                const row = tableBody.insertRow();
+
+                let cell = row.insertCell();
+                cell.textContent = index + 1; // Serial number based on the sorted order
+
+                cell = row.insertCell();
+                cell.textContent = item.companyName;
+
+                cell = row.insertCell();
+                cell.textContent = item.startDate;
+
+                cell = row.insertCell();
+                cell.textContent = item.stage;
+
+                cell = row.insertCell();
+                cell.textContent = item.txNotes;
+
+                cell = row.insertCell();
+                const statusText = item.ticketStatus || item.status;
+                const statusDiv = document.createElement('div');
+                statusDiv.textContent = statusText;
+                statusDiv.classList.add(`status-${statusText.toLowerCase().replace(' ', '-')}`);
+                cell.appendChild(statusDiv);
+
+                cell = row.insertCell();
+                const servicePersonnel = ["", "John Doe", "Jane Smith", "Peter Jones"];
+                const servicePersonSelect = document.createElement("select");
+                servicePersonnel.forEach(person => {
+                    const option = document.createElement("option");
+                    option.value = person;
+                    option.textContent = person || "Not Assigned";
+                    option.selected = item.servicePerson === person;
+                    servicePersonSelect.appendChild(option);
+                });
+                servicePersonSelect.addEventListener("change", (event) => {
+                    const originalIndex = allServiceRequests.findIndex(req => req === item);
+                    if (originalIndex !== -1) {
+                        allServiceRequests[originalIndex].servicePerson = event.target.value;
+                        saveServiceRequests();
+                        populateAllRequestsTable();
+                    }
+                });
+                cell.appendChild(servicePersonSelect);
+
+                cell = row.insertCell();
+                const statusSelect = document.createElement("select");
+                statusOptions.forEach(optionText => {
+                    const option = document.createElement("option");
+                    option.value = optionText;
+                    option.textContent = optionText;
+                    option.selected = (item.status || item.ticketStatus) === optionText;
+                    statusSelect.appendChild(option);
+                });
+                statusSelect.addEventListener("change", (event) => {
+                    const originalIndex = allServiceRequests.findIndex(req => req === item);
+                    if (originalIndex !== -1) {
+                        allServiceRequests[originalIndex].status = event.target.value;
+                        allServiceRequests[originalIndex].ticketStatus = event.target.value;
+                        if (event.target.value === "Solved" && !allServiceRequests[originalIndex].endDate) {
+                            allServiceRequests[originalIndex].endDate = formatDate(new Date());
+                        } else if (event.target.value !== "Solved") {
+                            allServiceRequests[originalIndex].endDate = "";
+                        }
+                        saveServiceRequests();
+                        populateAllRequestsTable();
+                    }
+                });
+                cell.appendChild(statusSelect);
+
+                cell = row.insertCell();
+                cell.textContent = calculateDuration(item.startDate, item.endDate);
+
+                cell = row.insertCell();
+                cell.textContent = item.endDate || "";
+            });
+        }
+
+        function calculateDuration(startDate, endDate) {
+            if (!startDate) return "";
+            const start = new Date(startDate);
+            const today = new Date();
+            let end;
+            if (endDate) {
+                end = new Date(endDate);
+                const diffInDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+                return `${diffInDays} days`;
+            } else {
+                const diffInDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+                return `${diffInDays} days`;
+            }
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${month}/${day}/${year}`;
+        }
+
+        // Load initial data if management is logged in (for direct access scenario)
+        if (isManagement) {
+            populateAllRequestsTable();
+            document.getElementById("managementLoginSection").style.display = 'none';
+            document.getElementById("managementSection").classList.remove("hidden");
+        } else {
+            // If not logged in, the login form is shown, and no table needs initial population.
+        }
+    </script>
+</body>
+</html>
