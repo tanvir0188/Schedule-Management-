@@ -125,6 +125,7 @@
             text-align: center;
         }
     </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
 <body>
@@ -146,10 +147,12 @@
         </div>
     </div>
 
+    <button onclick="logout()">Logout</button>
+    <a href="client.php">Make request</a>
     <div id="managementSection" class="hidden">
         <h2>Management Dashboard</h2>
-        <button onclick="logout()">Logout</button>
-        <a href="client.php">Make request</a>
+        <a href="Users.php">User list</a>
+
         <div id="addManagerSection" class="addManagerSection">
             <h3>Add New Manager</h3>
             <div class="form-group">
@@ -164,11 +167,39 @@
             <p id="addManagerMessage"></p>
         </div>
     </div>
+    <div class="container mt-5">
+        <h2>Service Requests Overview</h2>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Sl No</th>
+                        <th>Company Name</th>
+                        <th>Start Date</th>
+                        <th>Stage</th>
+                        <th>Tx Notes</th>
+                        <th>Ticket Status</th>
+                        <th>Service Person</th>
+                        <th>Current Duration</th>
+                        <th>End Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="clientOverviewTableBody">
+                    <!-- Dynamically filled by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="api-calls/management.js"></script>
     <script src="api-calls/login.js"></script>
     <script src="api-calls/signup.js"></script>
     <script src="api-calls/logout.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 
 
 </body>

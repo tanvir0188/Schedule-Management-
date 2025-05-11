@@ -1,51 +1,96 @@
 function submitRequest() {
+  const today = new Date().toISOString().split('T')[0];
+
   const data = {
     company_name: $("#companyName").val(),
-    start_date: $("#startDate").val(),
-    end_date: $("#endDate").val(),
+    start_date: today,
+    end_date: "", // Optional - blank at creation
     stage: $("#stage").val(),
     note: $("#notes").val(),
-    ticket_status: $("#ticketStatus").val(),
-    service_person: $("#servicePerson").val(),
-    current_duration: $("#currentDuration").val()
+    ticket_status: "pending",
+    service_person: "not assigned",
   };
 
   $.ajax({
-    url: "http://localhost/Schedule-Management-/backend/create_service_request.php", // Replace with your actual API path
+    url: "http://localhost/Schedule-Management-/backend/create_service_request.php",
     method: "POST",
     contentType: "application/json",
     data: JSON.stringify(data),
-    xhrFields: {
-      withCredentials: true
-    },
-    success: function(response) {
+    success: function (response) {
       if (response.status === "success") {
         alert("Service request created successfully.");
-        $("form")[0].reset(); // Reset form
+        $("form")[0].reset();
+        fetchServiceRequests(); // Optionally refresh table
       } else {
         alert("Error: " + response.message);
       }
     },
-    error: function() {
+    error: function () {
       alert("Failed to submit request. Please try again.");
     }
   });
 }
+function getStatusBadge(status) {
+  const lower = (status || "").toLowerCase();
+
+  switch (lower) {
+    case "pending":
+      return '<span class="badge bg-warning text-dark">Pending</span>';
+    case "solved":
+      return '<span class="badge bg-success">Solved</span>';
+    case "on process":
+      return '<span class="badge bg-info text-dark">On Process</span>';
+    default:
+      return `<span class="badge bg-secondary">${status}</span>`;
+  }
+}
+
+
 
 // Fetching service requests to populate the table
 function fetchServiceRequests() {
   $.ajax({
-    url: "http://localhost/Schedule-Management-/backend/get_service_requests.php", // Replace with your actual endpoint
+    url: "http://localhost/Schedule-Management-/backend/get_service_requests.php",
     method: "GET",
-    xhrFields: {
-      withCredentials: true
-    },
     success: function (response) {
       if (response.status === "success") {
         const tbody = $("#clientOverviewTableBody");
-        tbody.empty(); // Clear previous data
+        tbody.empty();
 
-        response.requests.forEach((req, index) => {
+        const today = new Date();
+
+        const statusPriority = {
+          "pending": 1,
+          "on process": 2,
+          "solved": 3
+        };
+
+        // Calculate durations and prepare sortable data
+        const requestsWithDuration = response.requests.map(req => {
+          const start = new Date(req.start_date);
+          const end = req.end_date ? new Date(req.end_date) : today;
+          const diffTime = Math.abs(end - start);
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+          return {
+            ...req,
+            current_duration_days: diffDays,
+            status_rank: statusPriority[(req.ticket_status || "").toLowerCase()] || 99 // default rank if unrecognized
+          };
+        });
+
+        // Sort by status rank and duration
+        requestsWithDuration.sort((a, b) => {
+          if (a.status_rank !== b.status_rank) {
+            return a.status_rank - b.status_rank; // lower rank (pending) first
+          }
+          return b.current_duration_days - a.current_duration_days; // higher duration first
+        });
+
+        // Render sorted rows
+        requestsWithDuration.forEach((req, index) => {
+          const current_duration = `${req.current_duration_days} day(s)`;
+
           const row = `
             <tr data-id="${req.id}">
               <td>${index + 1}</td>
@@ -53,16 +98,17 @@ function fetchServiceRequests() {
               <td>${req.start_date}</td>
               <td>${req.stage}</td>
               <td>${req.note || ""}</td>
-              <td>${req.ticket_status || ""}</td>
+              <td>${getStatusBadge(req.ticket_status)}</td>
               <td>${req.service_person || ""}</td>
-              <td>${req.current_duration || ""}</td>
-              <td>${req.end_date}</td>
+              <td>${current_duration}</td>
+              <td>${req.end_date || ""}</td>
               <td>
                 <button class="btn btn-sm btn-primary" onclick="editRequest(this, ${req.id})">Edit</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteRequest(${req.id})">Delete</button>
               </td>
             </tr>
           `;
+
           tbody.append(row);
         });
       } else {
@@ -75,55 +121,76 @@ function fetchServiceRequests() {
   });
 }
 
+
+
+
+
 // Edit request: Transform row into input fields
 function editRequest(button, id) {
   const row = button.closest('tr');
   const cells = row.querySelectorAll('td');
   const originalData = Array.from(cells).slice(1, 9).map(cell => cell.innerText);
 
-  // Replace cells with input fields
-  const fields = ['company_name', 'start_date', 'stage', 'note', 'ticket_status', 'service_person', 'current_duration', 'end_date'];
-  for (let i = 0; i < fields.length; i++) {
-    const value = originalData[i];
-    if (fields[i] === "start_date" || fields[i] === "end_date") {
-      // Use <input type="date"> for date fields
-      cells[i + 1].innerHTML = `<input type="date" class="form-control" value="${value}" data-field="${fields[i]}">`;
-    } else if (fields[i] === "current_duration") {
-      // Use <input type="number"> for duration
-      cells[i + 1].innerHTML = `<input type="number" class="form-control" value="${value}" data-field="${fields[i]}">`;
-    } else {
-      // Default to text input for other fields
-      cells[i + 1].innerHTML = `<input type="text" class="form-control" value="${value}" data-field="${fields[i]}">`;
-    }
-  }
+  // Editable fields: company_name, stage, note
+  const editableFields = ['company_name', 'stage', 'note'];
 
-  // Replace Edit with Save & Cancel
-  cells[9].innerHTML = `
-    <button class="btn btn-sm btn-success me-2" onclick="saveRequest(this, ${id})">Save</button>
-    <button class="btn btn-sm btn-secondary" onclick="cancelEdit(this, ${id}, ${JSON.stringify(originalData).replace(/"/g, '&quot;')})">Cancel</button>
-  `;
-}
+  // Fields corresponding to each <td> in order
+  const allFields = ['company_name', 'start_date', 'stage', 'note', 'ticket_status', 'service_person', 'current_duration', 'end_date'];
 
-// Save request: Send updated data to the backend
-function saveRequest(button, id) {
-  const row = button.closest('tr');
-  const cells = row.querySelectorAll('td');
-  const updatedData = {};
-
-  // Collect data from input fields
-  cells.forEach((cell, index) => {
-    if (index >= 1 && index <= 8) {
-      const input = cell.querySelector('input, select, textarea');
-      if (input) {
-        updatedData[input.getAttribute('data-field')] = input.value;
+  allFields.forEach((field, i) => {
+    if (editableFields.includes(field)) {
+      if (field === 'stage') {
+        // Create a select dropdown for 'stage'
+        const stageOptions = [
+          'Inspect on',
+          'Service',
+          'Parts Delivery & Servicing',
+          'Parts Delivery',
+          'Bill Submit & Forklift Collection'
+        ];
+        const stageSelect = stageOptions.map(option => 
+          `<option value="${option}" ${option === originalData[i] ? 'selected' : ''}>${option}</option>`
+        ).join('');
+        cells[i + 1].innerHTML = `<select class="form-select" data-field="${field}">${stageSelect}</select>`;
+      } else {
+        // Use text input for other editable fields
+        cells[i + 1].innerHTML = `<input type="text" class="form-control" value="${originalData[i]}" data-field="${field}">`;
       }
     }
   });
 
-  // Send the updated data via AJAX
+  // Replace action buttons
+  cells[9].innerHTML = `
+    <button class="btn btn-sm btn-success me-2" onclick="saveRequest(this, ${id})">Save</button>
+    <button class="btn btn-sm btn-secondary" onclick="cancelEdit(this, ${id}, '${encodeURIComponent(JSON.stringify(originalData))}')">Cancel</button>
+  `;
+}
+
+
+function saveRequest(button) {
+  const row = button.closest('tr');
+  const cells = row.querySelectorAll('td');
+  const updatedData = {};
+
+  // Get the ID from the row (if available) or from the URL
+  const id = row.getAttribute('data-id') || new URLSearchParams(window.location.search).get('id');
+
+  // Only extract allowed fields
+  ['company_name', 'stage', 'note'].forEach((field, i) => {
+    const cellIndex = ['company_name', 'start_date', 'stage', 'note', 'ticket_status', 'service_person', 'current_duration', 'end_date'].indexOf(field);
+    const input = cells[cellIndex + 1].querySelector('input, select'); // Allow for <select> elements like stage
+    if (input) {
+      updatedData[field] = input.value;
+    }
+  });
+
+  // Add the ID to the data being sent
+  updatedData.id = id;
+
+  // Send the updated data via AJAX using PATCH method
   $.ajax({
     url: `http://localhost/Schedule-Management-/backend/edit_service_request.php?id=${id}`,
-    method: "POST",
+    method: "PATCH", // Correct HTTP method for partial updates
     contentType: "application/json",
     data: JSON.stringify(updatedData),
     xhrFields: {
@@ -132,7 +199,7 @@ function saveRequest(button, id) {
     success: function (response) {
       if (response.status === "success") {
         alert('Service request updated successfully!');
-        fetchServiceRequests(); // Reload the requests
+        fetchServiceRequests(); // Reload the table
       } else {
         alert('Error: ' + response.message);
       }
@@ -143,25 +210,30 @@ function saveRequest(button, id) {
   });
 }
 
-// Cancel edit: Revert back to original data
-function cancelEdit(button, id, originalData) {
+
+
+function cancelEdit(button, id, encodedData) {
   const row = button.closest('tr');
   const cells = row.querySelectorAll('td');
+  const data = JSON.parse(decodeURIComponent(encodedData));
 
-  // Revert to original values
-  originalData = JSON.parse(originalData);
-  cells.forEach((cell, index) => {
-    if (index >= 1 && index <= 8) {
-      cell.innerHTML = originalData[index - 1];
+  const fields = ['company_name', 'start_date', 'stage', 'note', 'ticket_status', 'service_person', 'current_duration', 'end_date'];
+  for (let i = 0; i < fields.length; i++) {
+    // For status field, insert badge instead of plain text
+    if (fields[i] === 'ticket_status') {
+      cells[i + 1].innerHTML = getStatusBadge(data[i]);
+    } else {
+      cells[i + 1].innerText = data[i];
     }
-  });
+  }
 
-  // Replace Save & Cancel with Edit button
+  // Restore Edit and Delete buttons
   cells[9].innerHTML = `
     <button class="btn btn-sm btn-primary" onclick="editRequest(this, ${id})">Edit</button>
     <button class="btn btn-sm btn-danger" onclick="deleteRequest(${id})">Delete</button>
   `;
 }
+
 
 // Delete request (optional)
 function deleteRequest(id) {
@@ -188,10 +260,4 @@ function deleteRequest(id) {
 // Initialize on page load
 $(document).ready(function () {
   fetchServiceRequests(); // Populate the table on load
-});
-
-
-// Call this function on page load
-$(document).ready(function () {
-  fetchServiceRequests();
 });

@@ -24,16 +24,6 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label for="startDate" class="form-label">Start Date:</label>
-                    <input type="date" class="form-control" id="startDate" name="startDate" required>
-                </div>
-
-                <div class="col-md-6">
-                    <label for="endDate" class="form-label">End Date:</label>
-                    <input type="date" class="form-control" id="endDate" name="endDate" required>
-                </div>
-
-                <div class="col-md-6">
                     <label for="stage" class="form-label">Stage:</label>
                     <select class="form-select" id="stage" name="stage" required>
                         <option value="">Select Stage</option>
@@ -43,21 +33,6 @@
                         <option value="Parts Delivery">Parts Delivery</option>
                         <option value="Bill Submit & Forklift Collection">Bill Submit & Forklift Collection</option>
                     </select>
-                </div>
-
-                <div class="col-md-6">
-                    <label for="ticketStatus" class="form-label">Ticket Status:</label>
-                    <input type="text" class="form-control" id="ticketStatus" name="ticketStatus">
-                </div>
-
-                <div class="col-md-6">
-                    <label for="servicePerson" class="form-label">Service Person:</label>
-                    <input type="text" class="form-control" id="servicePerson" name="servicePerson">
-                </div>
-
-                <div class="col-md-6">
-                    <label for="currentDuration" class="form-label">Current Duration (in days):</label>
-                    <input type="number" class="form-control" id="currentDuration" name="currentDuration">
                 </div>
 
                 <div class="col-12">
@@ -99,7 +74,6 @@
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="api-calls/login.js"></script>
     <script src="api-calls/serviceRequest.js"></script>
     <!-- Bootstrap JS Bundle (includes Popper) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
